@@ -38,54 +38,98 @@ export async function GET(request: NextRequest) {
     
     // Format the content based on the available fields
     if (sectionsData) {
-      // Check for IT Act sections
-      if (sectionsData.IT_Sections_Applicable) {
+      // Add the name/title if available
+      if (sectionsData.Name) {
+        formattedContent += `${sectionsData.Name}\n\n`;
+      }
+
+      // Handle the specific structure shown in the example
+      if (sectionsData["IT Sections Applicable"] && typeof sectionsData["IT Sections Applicable"] === 'object') {
+        const itSectionsObj = sectionsData["IT Sections Applicable"];
+        
+        // Process each category in IT Sections Applicable
+        Object.entries(itSectionsObj).forEach(([category, sections]) => {
+          // Add the category as a header
+          formattedContent += `${category}:\n`;
+          
+          // Process the sections
+          if (Array.isArray(sections)) {
+            sections.forEach((section: string) => {
+              // Remove any brackets and clean up the text
+              const cleanedSection = section.replace(/[\[\]"]/g, '');
+              formattedContent += `${cleanedSection}\n`;
+            });
+          } else if (typeof sections === 'string') {
+            const cleanedSection = sections.replace(/[\[\]"]/g, '');
+            formattedContent += `${cleanedSection}\n`;
+          }
+          
+          formattedContent += '\n';
+        });
+      }
+      
+      // Handle IT_Sections_Applicable (alternative naming)
+      else if (sectionsData.IT_Sections_Applicable) {
         formattedContent += "IT Act Sections:\n";
         
-        // Check if it's an array or an object with nested fields
         if (Array.isArray(sectionsData.IT_Sections_Applicable)) {
-          // Handle array format
-          sectionsData.IT_Sections_Applicable.forEach((section: any, index: number) => {
+          sectionsData.IT_Sections_Applicable.forEach((section: any) => {
             if (typeof section === 'string') {
-              formattedContent += `${section}\n`;
+              // Remove any brackets and clean up the text
+              const cleanedSection = section.replace(/[\[\]"]/g, '');
+              formattedContent += `${cleanedSection}\n`;
             } else if (section && typeof section === 'object') {
-              // Handle object format within array
-              const sectionNumber = Object.keys(section)[0];
-              const description = section[sectionNumber];
-              formattedContent += `"IT Act Section ${sectionNumber} - ${description}"\n`;
+              Object.entries(section).forEach(([key, value]) => {
+                formattedContent += `${key} - ${value}\n`;
+              });
             }
           });
-        } else if (sectionsData.IT_Sections_Applicable && typeof sectionsData.IT_Sections_Applicable === 'object') {
-          // Handle object format
+        } else if (typeof sectionsData.IT_Sections_Applicable === 'object') {
           Object.entries(sectionsData.IT_Sections_Applicable).forEach(([key, value]) => {
-            formattedContent += `"IT Act Section ${key} - ${value}"\n`;
+            formattedContent += `${key}:\n`;
+            
+            if (Array.isArray(value)) {
+              value.forEach((item: string) => {
+                const cleanedItem = item.replace(/[\[\]"]/g, '');
+                formattedContent += `${cleanedItem}\n`;
+              });
+            } else {
+              formattedContent += `${value}\n`;
+            }
           });
         }
         
         formattedContent += "\n";
       }
       
-      // Check for IPC sections
+      // Handle IPC sections
       if (sectionsData.IPC_Sections) {
         formattedContent += "IPC Sections:\n";
         
-        // Check if it's an array or an object with nested fields
         if (Array.isArray(sectionsData.IPC_Sections)) {
-          // Handle array format
-          sectionsData.IPC_Sections.forEach((section: any, index: number) => {
+          sectionsData.IPC_Sections.forEach((section: any) => {
             if (typeof section === 'string') {
-              formattedContent += `${section}\n`;
+              // Remove any brackets and clean up the text
+              const cleanedSection = section.replace(/[\[\]"]/g, '');
+              formattedContent += `${cleanedSection}\n`;
             } else if (section && typeof section === 'object') {
-              // Handle object format within array
-              const sectionNumber = Object.keys(section)[0];
-              const description = section[sectionNumber];
-              formattedContent += `"IPC Section ${sectionNumber} - ${description}"\n`;
+              Object.entries(section).forEach(([key, value]) => {
+                formattedContent += `${key} - ${value}\n`;
+              });
             }
           });
-        } else if (sectionsData.IPC_Sections && typeof sectionsData.IPC_Sections === 'object') {
-          // Handle object format
+        } else if (typeof sectionsData.IPC_Sections === 'object') {
           Object.entries(sectionsData.IPC_Sections).forEach(([key, value]) => {
-            formattedContent += `"IPC Section ${key} - ${value}"\n`;
+            formattedContent += `${key}:\n`;
+            
+            if (Array.isArray(value)) {
+              value.forEach((item: string) => {
+                const cleanedItem = item.replace(/[\[\]"]/g, '');
+                formattedContent += `${item}\n`;
+              });
+            } else {
+              formattedContent += `${value}\n`;
+            }
           });
         }
         
@@ -102,9 +146,48 @@ export async function GET(request: NextRequest) {
         formattedContent = sectionsData.text;
       }
       
-      // If still no content, use a generic message with all available data
+      // If still no content, format the raw data in a more readable way
       if (formattedContent.trim() === "") {
-        formattedContent = JSON.stringify(sectionsData, null, 2);
+        // Instead of just stringifying, try to format it nicely
+        Object.entries(sectionsData).forEach(([key, value]) => {
+          if (key !== "Name") { // Skip name as it's already added at the top
+            formattedContent += `${key}:\n`;
+            
+            if (typeof value === 'object' && value !== null) {
+              if (Array.isArray(value)) {
+                value.forEach((item: any) => {
+                  if (typeof item === 'string') {
+                    const cleanedItem = item.replace(/[\[\]"]/g, '');
+                    formattedContent += `${cleanedItem}\n`;
+                  } else if (typeof item === 'object') {
+                    Object.entries(item).forEach(([subKey, subValue]) => {
+                      formattedContent += `${subKey}: ${subValue}\n`;
+                    });
+                  }
+                });
+              } else {
+                Object.entries(value).forEach(([subKey, subValue]) => {
+                  formattedContent += `${subKey}:\n`;
+                  
+                  if (Array.isArray(subValue)) {
+                    subValue.forEach((item: any) => {
+                      if (typeof item === 'string') {
+                        const cleanedItem = item.replace(/[\[\]"]/g, '');
+                        formattedContent += `${cleanedItem}\n`;
+                      }
+                    });
+                  } else {
+                    formattedContent += `${subValue}\n`;
+                  }
+                });
+              }
+            } else {
+              formattedContent += `${value}\n`;
+            }
+            
+            formattedContent += '\n';
+          }
+        });
       }
     }
 
