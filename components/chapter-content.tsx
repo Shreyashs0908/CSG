@@ -408,7 +408,9 @@ The scamster may even install a hidden camera near the ATM to capture your card 
                     <CardTitle>{section.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {section.title === "Relevant Sections" && typeof section.content === 'string' ? (
+                    {section.title === "Relevant Sections" && section.html ? (
+                      <div className="space-y-2" dangerouslySetInnerHTML={{ __html: section.html }} />
+                    ) : section.title === "Relevant Sections" && typeof section.content === 'string' ? (
                       <div className="space-y-2">
                         {section.content.split('\n').map((line, lineIndex) => {
                           // Check if the line is a category header (ends with a colon)

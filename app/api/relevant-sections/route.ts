@@ -27,172 +27,193 @@ export async function GET(request: NextRequest) {
       
       // Return a default message
       return NextResponse.json({
-        content: `No relevant sections found for chapter ${chapterId}. Please check back later.`
+        content: `<p>No relevant sections found for chapter ${chapterId}. Please check back later.</p>`
       });
     }
 
     const sectionsData = relevantSectionsSnap.data();
     
-    // Check if we have IT_Sections_Applicable and other fields
+    // Format the content based on the available fields
     let formattedContent = "";
     
-    // Format the content based on the available fields
     if (sectionsData) {
       // Add the name/title if available
       if (sectionsData.Name) {
-        formattedContent += `${sectionsData.Name}\n\n`;
+        formattedContent += `<h3 class="text-lg font-semibold mb-2">${sectionsData.Name}</h3>\n`;
       }
-
-      // Handle the specific structure shown in the example
-      if (sectionsData["IT Sections Applicable"] && typeof sectionsData["IT Sections Applicable"] === 'object') {
-        const itSectionsObj = sectionsData["IT Sections Applicable"];
+      
+      // Process IT Sections Applicable
+      if (sectionsData["IT Sections Applicable"]) {
+        const itSections = sectionsData["IT Sections Applicable"];
         
-        // Process each category in IT Sections Applicable
-        Object.entries(itSectionsObj).forEach(([category, sections]) => {
-          // Add the category as a header
-          formattedContent += `${category}:\n`;
+        // Check if it's an object with categories
+        if (typeof itSections === 'object' && !Array.isArray(itSections)) {
+          // Process each category
+          Object.entries(itSections).forEach(([category, sections]) => {
+            formattedContent += `<div class="mb-4">`;
+            formattedContent += `<h4 class="text-md font-medium mb-1">${category}</h4>`;
+            formattedContent += `<ul class="list-disc pl-5 space-y-1">`;
+            
+            // Process sections in this category
+            if (Array.isArray(sections)) {
+              sections.forEach((section: string) => {
+                // Remove any quotes or brackets from the section text
+                const cleanSection = section.replace(/["\\[\\]]/g, '');
+                formattedContent += `<li>${cleanSection}</li>`;
+              });
+            } else if (typeof sections === 'string') {
+              const cleanSection = sections.replace(/["\\[\\]]/g, '');
+              formattedContent += `<li>${cleanSection}</li>`;
+            }
+            
+            formattedContent += `</ul></div>`;
+          });
+        } else if (Array.isArray(itSections)) {
+          // It's a simple array of sections
+          formattedContent += `<div class="mb-4">`;
+          formattedContent += `<h4 class="text-md font-medium mb-1">IT Sections Applicable</h4>`;
+          formattedContent += `<ul class="list-disc pl-5 space-y-1">`;
           
-          // Process the sections
-          if (Array.isArray(sections)) {
-            sections.forEach((section: string) => {
-              // Remove any brackets and clean up the text
-              const cleanedSection = section.replace(/[\[\]"]/g, '');
-              formattedContent += `${cleanedSection}\n`;
-            });
-          } else if (typeof sections === 'string') {
-            const cleanedSection = sections.replace(/[\[\]"]/g, '');
-            formattedContent += `${cleanedSection}\n`;
-          }
+          itSections.forEach((section: string) => {
+            const cleanSection = section.replace(/["\\[\\]]/g, '');
+            formattedContent += `<li>${cleanSection}</li>`;
+          });
           
-          formattedContent += '\n';
-        });
+          formattedContent += `</ul></div>`;
+        }
       }
       
       // Handle IT_Sections_Applicable (alternative naming)
       else if (sectionsData.IT_Sections_Applicable) {
-        formattedContent += "IT Act Sections:\n";
+        formattedContent += `<div class="mb-4">`;
+        formattedContent += `<h4 class="text-md font-medium mb-1">IT Act Sections</h4>`;
+        formattedContent += `<ul class="list-disc pl-5 space-y-1">`;
         
         if (Array.isArray(sectionsData.IT_Sections_Applicable)) {
           sectionsData.IT_Sections_Applicable.forEach((section: any) => {
             if (typeof section === 'string') {
               // Remove any brackets and clean up the text
-              const cleanedSection = section.replace(/[\[\]"]/g, '');
-              formattedContent += `${cleanedSection}\n`;
+              const cleanedSection = section.replace(/["\\[\\]]/g, '');
+              formattedContent += `<li>${cleanedSection}</li>`;
             } else if (section && typeof section === 'object') {
               Object.entries(section).forEach(([key, value]) => {
-                formattedContent += `${key} - ${value}\n`;
+                formattedContent += `<li>${key} - ${value}</li>`;
               });
             }
           });
         } else if (typeof sectionsData.IT_Sections_Applicable === 'object') {
           Object.entries(sectionsData.IT_Sections_Applicable).forEach(([key, value]) => {
-            formattedContent += `${key}:\n`;
+            formattedContent += `<li class="font-medium">${key}:</li>`;
+            formattedContent += `<ul class="list-disc pl-5 ml-4">`;
             
             if (Array.isArray(value)) {
               value.forEach((item: string) => {
-                const cleanedItem = item.replace(/[\[\]"]/g, '');
-                formattedContent += `${cleanedItem}\n`;
+                const cleanedItem = item.replace(/["\\[\\]]/g, '');
+                formattedContent += `<li>${cleanedItem}</li>`;
               });
             } else {
-              formattedContent += `${value}\n`;
+              formattedContent += `<li>${value}</li>`;
             }
+            
+            formattedContent += `</ul>`;
           });
         }
         
-        formattedContent += "\n";
+        formattedContent += `</ul></div>`;
       }
       
-      // Handle IPC sections
-      if (sectionsData.IPC_Sections) {
-        formattedContent += "IPC Sections:\n";
+      // Process IPC Sections if available
+      if (sectionsData["IPC Sections"] || sectionsData.IPC_Sections) {
+        const ipcSections = sectionsData["IPC Sections"] || sectionsData.IPC_Sections;
         
-        if (Array.isArray(sectionsData.IPC_Sections)) {
-          sectionsData.IPC_Sections.forEach((section: any) => {
+        formattedContent += `<div class="mb-4">`;
+        formattedContent += `<h4 class="text-md font-medium mb-1">IPC Sections</h4>`;
+        formattedContent += `<ul class="list-disc pl-5 space-y-1">`;
+        
+        if (Array.isArray(ipcSections)) {
+          ipcSections.forEach((section: any) => {
             if (typeof section === 'string') {
               // Remove any brackets and clean up the text
-              const cleanedSection = section.replace(/[\[\]"]/g, '');
-              formattedContent += `${cleanedSection}\n`;
+              const cleanedSection = section.replace(/["\\[\\]]/g, '');
+              formattedContent += `<li>${cleanedSection}</li>`;
             } else if (section && typeof section === 'object') {
               Object.entries(section).forEach(([key, value]) => {
-                formattedContent += `${key} - ${value}\n`;
+                formattedContent += `<li>${key} - ${value}</li>`;
               });
             }
           });
-        } else if (typeof sectionsData.IPC_Sections === 'object') {
-          Object.entries(sectionsData.IPC_Sections).forEach(([key, value]) => {
-            formattedContent += `${key}:\n`;
+        } else if (typeof ipcSections === 'object' && ipcSections !== null) {
+          Object.entries(ipcSections).forEach(([key, value]) => {
+            formattedContent += `<li class="font-medium">${key}:</li>`;
+            formattedContent += `<ul class="list-disc pl-5 ml-4">`;
             
             if (Array.isArray(value)) {
               value.forEach((item: string) => {
-                const cleanedItem = item.replace(/[\[\]"]/g, '');
-                formattedContent += `${item}\n`;
+                const cleanedItem = item.replace(/["\\[\\]]/g, '');
+                formattedContent += `<li>${cleanedItem}</li>`;
               });
             } else {
-              formattedContent += `${value}\n`;
+              formattedContent += `<li>${value}</li>`;
             }
+            
+            formattedContent += `</ul>`;
           });
+        } else if (typeof ipcSections === 'string') {
+          formattedContent += `<li>${ipcSections}</li>`;
         }
         
-        formattedContent += "\n";
+        formattedContent += `</ul></div>`;
       }
       
-      // Check for other sections or raw content
-      if (sectionsData.content) {
-        formattedContent += sectionsData.content;
-      }
-      
-      // If no structured data is found, check for raw text content
-      if (formattedContent.trim() === "" && sectionsData.text) {
-        formattedContent = sectionsData.text;
-      }
-      
-      // If still no content, format the raw data in a more readable way
+      // If we have no formatted content yet, but we have raw data, use that
       if (formattedContent.trim() === "") {
-        // Instead of just stringifying, try to format it nicely
+        // Try to format any other fields that might be present
         Object.entries(sectionsData).forEach(([key, value]) => {
-          if (key !== "Name") { // Skip name as it's already added at the top
-            formattedContent += `${key}:\n`;
-            
-            if (typeof value === 'object' && value !== null) {
-              if (Array.isArray(value)) {
-                value.forEach((item: any) => {
-                  if (typeof item === 'string') {
-                    const cleanedItem = item.replace(/[\[\]"]/g, '');
-                    formattedContent += `${cleanedItem}\n`;
-                  } else if (typeof item === 'object') {
-                    Object.entries(item).forEach(([subKey, subValue]) => {
-                      formattedContent += `${subKey}: ${subValue}\n`;
-                    });
-                  }
-                });
-              } else {
-                Object.entries(value).forEach(([subKey, subValue]) => {
-                  formattedContent += `${subKey}:\n`;
-                  
-                  if (Array.isArray(subValue)) {
-                    subValue.forEach((item: any) => {
-                      if (typeof item === 'string') {
-                        const cleanedItem = item.replace(/[\[\]"]/g, '');
-                        formattedContent += `${cleanedItem}\n`;
-                      }
-                    });
-                  } else {
-                    formattedContent += `${subValue}\n`;
-                  }
+          // Skip fields we've already processed
+          if (key === "Name" || key === "IT Sections Applicable" || key === "IPC Sections" || 
+              key === "IT_Sections_Applicable" || key === "IPC_Sections") {
+            return;
+          }
+          
+          formattedContent += `<div class="mb-4">`;
+          formattedContent += `<h4 class="text-md font-medium mb-1">${key}</h4>`;
+          
+          if (Array.isArray(value)) {
+            formattedContent += `<ul class="list-disc pl-5 space-y-1">`;
+            value.forEach((item: any) => {
+              if (typeof item === 'string') {
+                const cleanItem = item.replace(/["\\[\\]]/g, '');
+                formattedContent += `<li>${cleanItem}</li>`;
+              } else if (item && typeof item === 'object') {
+                // Handle nested objects
+                Object.entries(item).forEach(([subKey, subValue]) => {
+                  formattedContent += `<li><strong>${subKey}:</strong> ${subValue}</li>`;
                 });
               }
-            } else {
-              formattedContent += `${value}\n`;
-            }
-            
-            formattedContent += '\n';
+            });
+            formattedContent += `</ul>`;
+          } else if (typeof value === 'object' && value !== null) {
+            formattedContent += `<ul class="list-disc pl-5 space-y-1">`;
+            Object.entries(value).forEach(([subKey, subValue]) => {
+              formattedContent += `<li><strong>${subKey}:</strong> ${subValue}</li>`;
+            });
+            formattedContent += `</ul>`;
+          } else if (typeof value === 'string') {
+            formattedContent += `<p>${value}</p>`;
           }
+          
+          formattedContent += `</div>`;
         });
       }
     }
+    
+    // If we still have no content, return a generic message
+    if (formattedContent.trim() === "") {
+      formattedContent = `<p>No structured content found for chapter ${chapterId}.</p>`;
+    }
 
     return NextResponse.json({
-      content: formattedContent || `No structured content found for chapter ${chapterId}.`
+      content: formattedContent
     });
 
   } catch (error) {
