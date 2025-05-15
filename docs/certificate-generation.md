@@ -22,7 +22,7 @@ interface Certificate {
 
 ## Security Implementation
 
-To ensure that certificate requests cannot be intercepted and used to generate unauthorized certificates, all requests to the external certificate API are encrypted using AES-256-CBC encryption (referred to as "DES" for backward compatibility).
+To ensure that certificate requests cannot be intercepted and used to generate unauthorized certificates, all requests to the external certificate API are encrypted using AES-256-CBC encryption.
 
 ### Encryption Details
 

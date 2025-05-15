@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { v4 as uuidv4 } from 'uuid'
-import { encryptWithDES, DES_ENCRYPTION_KEY } from "@/lib/certificate-encryption"
+import { encryptWithAES, AES_ENCRYPTION_KEY } from "@/lib/certificate-encryption"
 
 // Define the structure for certificate data
 interface Certificate {
@@ -113,8 +113,8 @@ async function generateCertificateFromExternalAPI(certificateData: Certificate):
   try {
     console.log("Generating certificate from external API:", CERTIFICATE_API_URL);
     
-    // Encrypt the certificate data using DES
-    const encryptedData = encryptWithDES(certificateData);
+    // Encrypt the certificate data using AES-256-CBC
+    const encryptedData = encryptWithAES(certificateData);
     console.log("Certificate data encrypted successfully");
     
     // Send the encrypted data to the external API
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "Certificate generated successfully",
       certificate,
-      encryptionKey: DES_ENCRYPTION_KEY // Include the encryption key in the response for development purposes only
+      encryptionKey: AES_ENCRYPTION_KEY // Include the encryption key in the response for development purposes only
     })
   } catch (error) {
     console.error("Error generating certificate:", error)

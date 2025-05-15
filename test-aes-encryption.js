@@ -1,4 +1,4 @@
-// Test script for certificate encryption
+// Test script for AES-256-CBC certificate encryption
 const crypto = require('crypto');
 
 // Encryption key for certificate data (32 bytes for AES-256)
@@ -64,14 +64,13 @@ function decryptWithAES(encryptedData) {
 const testCertificate = {
   certificateId: "CSG-12345678",
   userId: "user123",
-  email: "test@example.com",
-  name: "Test User",
+  email: "user@example.com",
+  name: "John Doe",
   issueDate: new Date().toISOString(),
-  expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+  expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
   isValid: true
 };
 
-console.log("=== CERTIFICATE ENCRYPTION TEST ===");
 console.log("\nOriginal Certificate Data:");
 console.log(testCertificate);
 
@@ -90,8 +89,8 @@ const parsedData = JSON.parse(decryptedData);
 console.log("\nParsed Certificate Data:");
 console.log(parsedData);
 
-// Verify the decryption worked correctly
-console.log("\nVerification:");
+// Verify the data matches
+console.log("\n=== VERIFICATION ===");
 console.log("Certificate ID matches:", parsedData.certificateId === testCertificate.certificateId);
 console.log("User ID matches:", parsedData.userId === testCertificate.userId);
 console.log("Email matches:", parsedData.email === testCertificate.email);
@@ -102,3 +101,26 @@ console.log("AES Encryption Key:", AES_ENCRYPTION_KEY);
 console.log("AES Initialization Vector:", AES_IV);
 console.log("Algorithm: AES-256-CBC");
 console.log("\nNOTE: This key should be kept secure and only shared with the certificate generation service.");
+
+// Example API request data
+const apiRequestData = {
+  encryptedData: encryptedData
+};
+
+console.log("\n=== EXAMPLE API REQUEST ===");
+console.log(JSON.stringify(apiRequestData, null, 2));
+
+// Example of how the external API would decrypt the data
+console.log("\n=== EXTERNAL API DECRYPTION SIMULATION ===");
+try {
+  const receivedEncryptedData = apiRequestData.encryptedData;
+  const decryptedApiData = decryptWithAES(receivedEncryptedData);
+  const parsedApiData = JSON.parse(decryptedApiData);
+  
+  console.log("Decryption successful!");
+  console.log("Decrypted certificate data:", parsedApiData);
+  console.log("Certificate belongs to:", parsedApiData.name);
+  console.log("Certificate ID:", parsedApiData.certificateId);
+} catch (error) {
+  console.error("API decryption failed:", error);
+}
