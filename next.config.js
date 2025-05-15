@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Server configuration
+  server: {
+    port: 12000,
+    host: '0.0.0.0',
+    allowedHosts: true,
+  },
   // Allow embedding in iframes
   async headers() {
     return [
