@@ -118,6 +118,11 @@ export function Certificate() {
             
             if (certificateData.certificate) {
               setCertificate(certificateData.certificate)
+              
+              // Log encryption key for development purposes only
+              if (certificateData.encryptionKey) {
+                console.log("Certificate encryption key:", certificateData.encryptionKey)
+              }
             } else {
               throw new Error("Failed to generate certificate")
             }

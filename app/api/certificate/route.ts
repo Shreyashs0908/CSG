@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { v4 as uuidv4 } from 'uuid'
+import { encryptWithDES, DES_ENCRYPTION_KEY } from "@/lib/certificate-encryption"
 
 // Define the structure for certificate data
 interface Certificate {
@@ -12,6 +13,9 @@ interface Certificate {
   expiryDate: string
   isValid: boolean
 }
+
+// External certificate generation API URL
+const CERTIFICATE_API_URL = "https://www.csgcertificate.com/details";
 
 // GET: Verify certificate
 export async function GET(request: NextRequest) {
@@ -102,6 +106,43 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Generate certificate using external API with DES encryption
+ */
+async function generateCertificateFromExternalAPI(certificateData: Certificate): Promise<any> {
+  try {
+    console.log("Generating certificate from external API:", CERTIFICATE_API_URL);
+    
+    // Encrypt the certificate data using DES
+    const encryptedData = encryptWithDES(certificateData);
+    console.log("Certificate data encrypted successfully");
+    
+    // Send the encrypted data to the external API
+    const response = await fetch(CERTIFICATE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        encryptedData,
+        // Include any other required parameters for the API
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`External certificate API returned status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log("Certificate generated successfully from external API");
+    
+    return result;
+  } catch (error) {
+    console.error("Error generating certificate from external API:", error);
+    throw error;
+  }
+}
+
 // POST: Generate certificate
 export async function POST(request: NextRequest) {
   try {
@@ -167,13 +208,24 @@ export async function POST(request: NextRequest) {
       isValid: true
     }
 
+    try {
+      // Generate certificate using external API with DES encryption
+      await generateCertificateFromExternalAPI(certificate);
+      console.log("Certificate generated from external API successfully");
+    } catch (apiError) {
+      console.error("Failed to generate certificate from external API:", apiError);
+      // Continue with local certificate generation as fallback
+      console.log("Falling back to local certificate generation");
+    }
+
     // Store certificate in Firestore
     await adminDb.collection("certificates").doc(certificateId).set(certificate)
 
     return NextResponse.json({
       success: true,
       message: "Certificate generated successfully",
-      certificate
+      certificate,
+      encryptionKey: DES_ENCRYPTION_KEY // Include the encryption key in the response for development purposes only
     })
   } catch (error) {
     console.error("Error generating certificate:", error)
