@@ -11,6 +11,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RedirectLoader } from "@/components/redirect-loader";
 import {
   Shield,
   Code,
@@ -101,7 +102,7 @@ const ModuleCarousel = ({ imagesPerSlide = 4 }) => {
     (_, index) => index + 1
   );
 
-  return (
+ return (
     <section id="modules" className="py-20 bg-gray-100 dark:bg-gray-800">
       <div className="container mx-auto">
         <motion.div
@@ -120,7 +121,7 @@ const ModuleCarousel = ({ imagesPerSlide = 4 }) => {
             <motion.div key={num} whileHover={{ scale: 1.05 }} className="p-2">
               <div className="bg-white dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg">
                 <Image
-                  src={`https://www.cybersafegirl.com/youtubethumbnails1/${num}.png?height=200&width=300&text=Module`}
+                  src={`/modules/${num}.webp?height=200&width=300&text=Module`}
                   width={300}
                   height={200}
                   alt={`Module ${num}`}
@@ -170,7 +171,7 @@ const PosterCarousel = ({ imagesPerSlide = 4 }) => {
                   rel="noopener noreferrer"
                 >
                   <Image
-                    src={`https://www.cybersafegirl.com/posterThumnail/post${num}.png?height=300&width=200&text=Poster`}
+                    src={`/posters/${num}.webp?height=300&width=200&text=Poster`}
                     width={200}
                     height={300}
                     alt={`Poster ${num}`}
@@ -196,6 +197,8 @@ export default function HomePage() {
   const [moduleIndex, setModuleIndex] = useState(1);
   const [posterIndex, setPosterIndex] = useState(1);
   const [isEbookMenuOpen, setIsEbookMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Refs for sections
   const aboutRef = useRef<HTMLElement>(null);
@@ -225,6 +228,35 @@ export default function HomePage() {
       behavior: "smooth",
     });
   };
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      // Check if we just logged out (URL has a logout parameter)
+      const justLoggedOut = window.location.search.includes('logout=true');
+      
+      if (justLoggedOut) {
+        // If we just logged out, don't redirect
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+        return;
+      }
+      
+      // Check for auth tokens in various storage mechanisms
+      const hasAuthCookie = document.cookie.includes('firebase-auth-token');
+      const hasLocalStorageToken = !!localStorage.getItem('firebase-auth-token');
+      const hasSessionStorageToken = !!sessionStorage.getItem('firebase-auth-token');
+      
+      // If any auth token exists, user is authenticated
+      const authenticated = hasAuthCookie || hasLocalStorageToken || hasSessionStorageToken;
+      setIsAuthenticated(authenticated);
+      setIsCheckingAuth(false);
+    };
+    
+    // Small delay to ensure all storage is checked properly
+    const timer = setTimeout(checkAuth, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle scroll events
   useEffect(() => {
@@ -309,6 +341,14 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Show loader and redirect if authenticated */}
+      {!isCheckingAuth && isAuthenticated && (
+        <RedirectLoader 
+          redirectTo="/dashboard" 
+          message="You're already logged in. Redirecting to dashboard..." 
+        />
+      )}
+      
       {/* Top Bar - Added from original site */}
       <div className="hidden md:block bg-gray-900 text-white py-2">
         <div className="container mx-auto flex justify-between items-center">
@@ -722,7 +762,7 @@ export default function HomePage() {
                   className="text-center inline-flex items-center justify-center w-20 h-20 mb-6 shadow-lg rounded-full bg-white dark:bg-gray-700"
                 >
                   <Image
-                    src="https://www.cybersafegirl.com/Images/Author.png"
+                    src="/author/Author.webp"
                     width={80}
                     height={80}
                     alt="Dr. Ananth Prabhu G"
@@ -806,7 +846,7 @@ export default function HomePage() {
                 whileHover={{ scale: 1.05 }}
                 className="bg-gray-50 dark:bg-gray-800 p-8 rounded-lg shadow-lg text-center"
               >
-                <div className="text-4xl font-bold text-blue-600 mb-2">50+</div>
+                <div className="text-4xl font-bold text-blue-600 mb-2">70+</div>
                 <div className="text-xl font-semibold">Chapters / Episodes</div>
               </motion.div>
 
@@ -963,8 +1003,8 @@ export default function HomePage() {
                   Services
                 </h3>
                 <p className="text-lg font-light text-justify leading-relaxed mt-4 mb-4 text-gray-600 dark:text-gray-300">
-                  Cyber Safe Girl is an E-Learning Program, containing 50+
-                  animated info toons, explained in detail by Dr. Ananth Prabhu
+                  Cyber Safe Girl is an E-Learning Program, containing 70+
+                  animated infotoons, explained in detail by Dr. Ananth Prabhu
                   G.
                 </p>
                 <div className="block pb-6">
@@ -1071,7 +1111,7 @@ export default function HomePage() {
                       <div className="px-4 py-3">
                         <div className="text-gray-500 p-3 inline-flex items-center justify-center w-32 h-32 mb-5 shadow-lg rounded-full bg-white dark:bg-gray-700">
                           <Image
-                            src="https://cybersafegirl.com/Images/govtOfKarnataka.png?height=64&width=64"
+                            src="/partners/govtOfKarnataka.webp"
                             width={128}
                             height={128}
                             alt="Government of Karnataka"
@@ -1091,7 +1131,7 @@ export default function HomePage() {
                       <div className="px-4 py-1">
                         <div className="text-gray-500 p-3 bg-white dark:bg-gray-700 inline-flex items-center justify-center w-32 h-32 mb-5 shadow-lg rounded-full">
                           <Image
-                            src="https://cybersafegirl.vercel.app/static/media/ISEA.ecc9b185646d68183cd0.png?height=64&width=64"
+                            src="/partners/ISEA.webp"
                             width={128}
                             height={128}
                             alt="ISEA"
@@ -1113,7 +1153,7 @@ export default function HomePage() {
                       <div className="px-4 py-3">
                         <div className="text-gray-500 p-3 inline-flex items-center justify-center w-32 h-32 mb-5 shadow-lg rounded-full bg-white dark:bg-gray-700">
                           <Image
-                            src="https://cybersafegirl.vercel.app/static/media/sp.d27fb5237869262928fd.png?height=64&width=64"
+                            src="/partners/surePass.webp"
                             width={128}
                             height={128}
                             alt="SurePass"
@@ -1133,7 +1173,7 @@ export default function HomePage() {
                       <div className="px-4">
                         <div className="text-gray-500 p-3 inline-flex items-center justify-center w-32 h-32 mb-5 shadow-lg rounded-full bg-white dark:bg-gray-700">
                           <Image
-                            src="https://cybersafegirl.com/Images/cyber-jagrithi.png?height=64&width=64"
+                            src="/partners/cyber-jagrithi.webp"
                             width={128}
                             height={128}
                             alt="Cyber Jagrithi"
@@ -1370,8 +1410,8 @@ export default function HomePage() {
                 <span className="font-bold text-xl">Cyber Safe Girl</span>
               </motion.div>
               <p className="text-gray-400 mb-4">
-                Empowering women and girls with cybersecurity knowledge to stay
-                safe online.
+                Empowering women and girls with cybersecurity <br />
+                knowledge to stay safe online.
               </p>
               <div className="flex space-x-4">
                 <motion.a
@@ -1512,11 +1552,11 @@ export default function HomePage() {
                 Designed and Developed By:
               </h3>
               {/* Container with overlapping effect */}
-              <div className="flex items-center space-x-[-20px]">
-                {devs.map((dev) => (
+              <div className="flex items-center">
+                {devs.map((dev, index) => (
                   <div
                     key={dev.name}
-                    className="group flex flex-col items-center cursor-pointer transition-transform duration-300 hover:scale-110"
+                    className={`group flex flex-col items-center cursor-pointer transition-transform duration-300 hover:scale-110 ${index !== 0 ? '-ml-6' : '-mr-5'}`}
                   >
                     <a href={dev.url} target="_blank" rel="noopener noreferrer">
                       <div className="relative w-16 h-16">
@@ -1528,7 +1568,6 @@ export default function HomePage() {
                         />
                       </div>
                     </a>
-                    {/* The name appears below on hover */}
                     <span className="mt-2 text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       {dev.name}
                     </span>

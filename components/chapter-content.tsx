@@ -15,6 +15,7 @@ import Link from "next/link";
 import { QuizModal } from "@/components/quiz-modal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { useProgress } from "@/lib/progress-context";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -26,11 +27,13 @@ interface UserProgress {
   finalTestCompleted: boolean;
   certificateUnlocked: boolean;
   lastUpdated: string;
+  chapterQuizScores?: Record<string, { score: number, totalQuestions: number }>;
 }
 
 export function ChapterContent({ chapterId }: { chapterId: string }) {
   const { user } = useAuth();
   const router = useRouter();
+  const { refreshProgress } = useProgress(); // Get refreshProgress function from progress context
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [chapterCompleted, setChapterCompleted] = useState(false);
   const [chapterUnlocked, setChapterUnlocked] = useState(false);
@@ -39,10 +42,41 @@ export function ChapterContent({ chapterId }: { chapterId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
+  const [relevantSections, setRelevantSections] = useState<string | null>(null);
+  const [loadingRelevantSections, setLoadingRelevantSections] = useState(false);
+  const [relevantSectionsError, setRelevantSectionsError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Format chapter ID for API calls (e.g., "1" -> "CH-001")
   const formattedChapterId = `CH-${chapterId.padStart(3, '0')}`;
+
+  // Fetch relevant sections from Firebase
+  useEffect(() => {
+    async function fetchRelevantSections() {
+      if (!formattedChapterId) return;
+      
+      setLoadingRelevantSections(true);
+      setRelevantSectionsError(null);
+      
+      try {
+        const response = await fetch(`/api/relevant-sections?chapterId=${formattedChapterId}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setRelevantSections(data.content);
+      } catch (err: any) {
+        console.error("Failed to fetch relevant sections:", err);
+        setRelevantSectionsError("Failed to load relevant sections for this chapter.");
+      } finally {
+        setLoadingRelevantSections(false);
+      }
+    }
+    
+    fetchRelevantSections();
+  }, [formattedChapterId]);
 
   // Fetch user progress when component mounts
   useEffect(() => {
@@ -73,6 +107,13 @@ export function ChapterContent({ chapterId }: { chapterId: string }) {
         const isUnlocked = data.progress.unlockedChapters.includes(formattedChapterId);
         setChapterUnlocked(isUnlocked);
         
+        // Check if we have stored scores for this chapter
+        if (data.progress.chapterQuizScores && data.progress.chapterQuizScores[formattedChapterId]) {
+          const chapterScore = data.progress.chapterQuizScores[formattedChapterId];
+          setChapterScore(chapterScore.score);
+          setTotalQuestions(chapterScore.totalQuestions);
+        }
+        
         // If chapter is not unlocked, redirect to dashboard
         if (!isUnlocked) {
           toast({
@@ -92,13 +133,20 @@ export function ChapterContent({ chapterId }: { chapterId: string }) {
               const analyticsData = await analyticsResponse.json();
               
               if (analyticsData.quizAnalytics && analyticsData.quizAnalytics.length > 0) {
-                // Get the most recent attempt
-                const latestAttempt = analyticsData.quizAnalytics.sort(
-                  (a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-                )[0];
+                // Filter analytics for the current chapter only
+                const chapterAnalytics = analyticsData.quizAnalytics.filter(
+                  (analytics: any) => analytics.chapterId === formattedChapterId
+                );
                 
-                setChapterScore(latestAttempt.score);
-                setTotalQuestions(latestAttempt.totalQuestionsAttempted);
+                if (chapterAnalytics.length > 0) {
+                  // Get the most recent attempt for this chapter
+                  const latestAttempt = chapterAnalytics.sort(
+                    (a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+                  )[0];
+                  
+                  setChapterScore(latestAttempt.score);
+                  setTotalQuestions(latestAttempt.totalQuestionsAttempted);
+                }
               }
             }
           } catch (err) {
@@ -139,26 +187,12 @@ The scamster may even install a hidden camera near the ATM to capture your card 
     sections: [
       {
         title: "Relevant Sections",
-        content:
-          chapterId === "1"
-            ? `IPC Sections (to be applied to the Shop Keeper)
-IPC Section 354A - Sexual Harassment and punishment for Sexual Harassment
-IPC Section 354C - Voyeurism
-IPC Section 383/384 - Extortion (IF ANY DEMAND)
-IPC Section 503 - Criminal Intimidation
-IPC Section 506 - Punishment for Criminal Intimidation
-IPC Section 509 - Word, gesture or act intended to insult modesty of a woman
-IT Act:
-IT Act Section 66E - Punishment for violation of privacy Mobile Number Sale to Stalkers by Recharge Shop`
-            : chapterId === "2"
-            ? `IPC Sections:
-IPC Section 420 - Cheating and dishonestly inducing delivery of property
-IPC Section 467 - Forgery of valuable security, will, etc.
-IPC Section 468 - Forgery for purpose of cheating
-IT Act:
-IT Act Section 66C - Punishment for identity theft
-IT Act Section 66D - Punishment for cheating by personation by using computer resource`
-            : "This section would contain relevant legal sections for this chapter.",
+        content: relevantSections || 
+          (loadingRelevantSections 
+            ? "Loading relevant sections..." 
+            : relevantSectionsError 
+              ? relevantSectionsError 
+              : "No relevant sections available for this chapter."),
       },
       {
         title: "Tips / Precautions",
@@ -174,6 +208,7 @@ IT Act Section 66D - Punishment for cheating by personation by using computer re
   };
 
   const handleQuizComplete = (score: number, totalQuestions: number, passed: boolean) => {
+    // Set the score specifically for this chapter
     setChapterScore(score);
     setTotalQuestions(totalQuestions);
 
@@ -188,6 +223,17 @@ IT Act Section 66D - Punishment for cheating by personation by using computer re
           updatedProgress.completedChapters.push(formattedChapterId);
         }
         
+        // Store the chapter score in the progress object if it doesn't exist
+        if (!updatedProgress.chapterQuizScores) {
+          updatedProgress.chapterQuizScores = {};
+        }
+        
+        // Update the score for this specific chapter
+        updatedProgress.chapterQuizScores[formattedChapterId] = {
+          score: score,
+          totalQuestions: totalQuestions
+        };
+        
         // Unlock next chapter
         const chapterNumber = parseInt(chapterId);
         const nextChapterId = `CH-${(chapterNumber + 1).toString().padStart(3, '0')}`;
@@ -198,6 +244,10 @@ IT Act Section 66D - Punishment for cheating by personation by using computer re
         
         setUserProgress(updatedProgress);
       }
+            
+      // Refresh the progress context to update the sidebar
+      refreshProgress();
+      console.log("Progress refreshed after quiz completion");
       
       toast({
         title: "Chapter Completed!",
@@ -295,7 +345,7 @@ IT Act Section 66D - Punishment for cheating by personation by using computer re
                       variant="outline"
                       asChild
                       className={`justify-start ${
-                        !chapterCompleted ? "pointer-events-none opacity-50" : ""
+                        !chapterCompleted || Number.parseInt(chapterId) >= 70 ? "pointer-events-none opacity-50" : ""
                       }`}
                     >
                       <Link href={`/chapters/${Number.parseInt(chapterId) + 1}`}>
@@ -358,7 +408,36 @@ IT Act Section 66D - Punishment for cheating by personation by using computer re
                     <CardTitle>{section.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="whitespace-pre-line">{section.content}</div>
+                    {section.title === "Relevant Sections" && section.html ? (
+                      <div className="space-y-2" dangerouslySetInnerHTML={{ __html: section.html }} />
+                    ) : section.title === "Relevant Sections" && typeof section.content === 'string' ? (
+                      <div className="space-y-2">
+                        {section.content.split('\n').map((line, lineIndex) => {
+                          // Check if the line is a category header (ends with a colon)
+                          if (line.trim().endsWith(':')) {
+                            return (
+                              <h3 key={lineIndex} className="font-bold text-lg mt-4 text-blue-600">
+                                {line}
+                              </h3>
+                            );
+                          } 
+                          // Check if it's an empty line
+                          else if (line.trim() === '') {
+                            return <div key={lineIndex} className="h-2"></div>;
+                          }
+                          // Regular content line
+                          else {
+                            return (
+                              <p key={lineIndex} className="ml-4">
+                                {line}
+                              </p>
+                            );
+                          }
+                        })}
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-line">{section.content}</div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

@@ -11,6 +11,23 @@ export interface Chapter {
   locked: boolean
 }
 
+// Define user progress interface
+export interface UserProgress {
+  userId: string
+  email?: string
+  name?: string
+  completedChapters: string[]
+  unlockedChapters: string[]
+  finalTestUnlocked: boolean
+  finalTestCompleted: boolean
+  certificateUnlocked: boolean
+  paymentCompleted: boolean
+  finalTestScore?: number
+  finalTestTotalQuestions?: number
+  chapterQuizScores?: Record<string, { score: number, totalQuestions: number }>
+  lastUpdated: string
+}
+
 // Define the context type
 interface ProgressContextType {
   chapters: Chapter[]
@@ -18,6 +35,7 @@ interface ProgressContextType {
   certificateUnlocked: boolean
   isLoading: boolean
   refreshProgress: () => void
+  progress?: UserProgress
 }
 
 // Create the context
@@ -29,6 +47,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [finalTestUnlocked, setFinalTestUnlocked] = useState(false)
   const [certificateUnlocked, setCertificateUnlocked] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [progress, setProgress] = useState<UserProgress | undefined>(undefined)
   const { user } = useAuth()
 
   // Function to fetch user progress
@@ -40,12 +59,15 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
 
     setIsLoading(true)
     try {
-      console.log("Fetching user progress for user:", user.id)
-      const response = await fetch(`/api/user-progress?userId=${user.id}`)
+      console.log("Fetching user progress for user:", user.name, "(", user.email, ")", "ID:", user.id)
+      const response = await fetch(`/api/user-progress?userId=${user.id}&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.name)}`)
       const data = await response.json()
       
       console.log("User progress data received:", data)
       if (data.progress) {
+        // Store the full progress data
+        setProgress(data.progress);
+        
         const { completedChapters, unlockedChapters, finalTestUnlocked, certificateUnlocked } = data.progress
         
         console.log("Completed chapters:", completedChapters)
@@ -59,7 +81,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         console.log("Unlocked chapter IDs:", unlockedChapterIds)
         
         // Create chapters array with correct locked/completed status
-        const chaptersData = Array.from({ length: 60 }, (_, i) => {
+        const chaptersData = Array.from({ length: 70 }, (_, i) => {
           const chapterId = i + 1
           return {
             id: chapterId,
@@ -77,7 +99,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error fetching user progress:", error)
       // Fallback to default state if fetch fails
-      const defaultChapters = Array.from({ length: 60 }, (_, i) => ({
+      const defaultChapters = Array.from({ length: 70 }, (_, i) => ({
         id: i + 1,
         title: `Chapter ${i + 1}`,
         completed: false,
@@ -100,7 +122,8 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     finalTestUnlocked,
     certificateUnlocked,
     isLoading,
-    refreshProgress: fetchUserProgress
+    refreshProgress: fetchUserProgress,
+    progress
   }
 
   return (

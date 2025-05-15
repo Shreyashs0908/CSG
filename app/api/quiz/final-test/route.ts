@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Reference to the document containing the questions for the final test
-    const questionsRef = adminDb.doc('Quiz-DB/final-test/question-set/questions');
+    const questionsRef = adminDb.doc('Quiz-DB/FINAL/question-set/questions');
     const questionsSnap = await questionsRef.get();
 
     if (!questionsSnap.exists) {
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       await questionsRef.set(defaultQuestions);
       
       // Save default answer key
-      const answerKeyRef = adminDb.doc('Quiz-DB/final-test/answer-key/answers');
+      const answerKeyRef = adminDb.doc('Quiz-DB/FINAL/answer-key/answers');
       await answerKeyRef.set(defaultAnswerKey);
       
       // Convert questions object to an array for response
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Reference to the document containing the correct answers for the final test
-    const answersRef = adminDb.doc('Quiz-DB/final-test/answer-key/answers');
+    const answersRef = adminDb.doc('Quiz-DB/FINAL/answer-key/answers');
     const answersSnap = await answersRef.get();
 
     if (!answersSnap.exists) {
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
 
     // --- Prepare User Analytics ---
     const userAnalytics = {
-      testId: "final-test",
+      testId: "FINAL",
       userId: userId,
       score: score,
       totalQuestionsAttempted: totalQuestionsAttempted,
@@ -195,6 +195,38 @@ export async function POST(request: NextRequest) {
     
     console.log("Final Test API POST - Analytics stored in Firestore");
 
+    // Calculate passing score (30% or higher)
+    const passingScore = Math.ceil(totalQuestionsAttempted * 0.3);
+    const passed = score >= passingScore;
+
+    // Get user progress data to retrieve email and name
+    const userProgressRef = adminDb.collection("userProgress").doc(userId);
+    const userProgressSnap = await userProgressRef.get();
+    
+    if (userProgressSnap.exists) {
+      const progressData = userProgressSnap.data();
+      
+      // Update progress to mark final test as completed and store score
+      const updateData: any = {
+        finalTestCompleted: true,
+        finalTestScore: score,
+        finalTestTotalQuestions: totalQuestionsAttempted,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // If user passed, unlock certificate
+      if (passed) {
+        updateData.certificateUnlocked = true;
+      }
+      
+      await userProgressRef.update(updateData);
+      
+      console.log("Final Test API POST - User progress updated with score:", score, "out of", totalQuestionsAttempted);
+      if (passed) {
+        console.log("Final Test API POST - Certificate unlocked");
+      }
+    }
+
     // --- Send User Analytics back to Frontend ---
     return NextResponse.json({
       message: "Final test evaluated successfully",
@@ -202,6 +234,8 @@ export async function POST(request: NextRequest) {
       totalQuestionsAttempted: totalQuestionsAttempted,
       evaluationDetails: evaluationDetails,
       analytics: userAnalytics,
+      passed: passed,
+      certificateUnlocked: passed
     }, { status: 200 });
 
   } catch (error) {

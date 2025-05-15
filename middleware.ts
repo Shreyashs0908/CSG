@@ -1,67 +1,113 @@
+// middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// This function can be marked `async` if using `await` inside
 export async function middleware(request: NextRequest) {
-  // Get the pathname of the request
-  const path = request.nextUrl.pathname
-  
-  // Define public paths that don't require authentication
-  const isPublicPath = 
-    path === '/login' || 
-    path === '/register' ||
-    path === '/homepage' || 
-    path === '/' || 
-    path.startsWith('/api/auth/') ||
-    path === '/introduction' ||
-    path.includes('/_next/') ||
-    path.includes('/static/') ||
-    path.includes('/images/') ||
-    path.includes('/favicon.ico')
-  
-  // If it's a public path, allow access
+  let { pathname, origin } = request.nextUrl
+
+  // 1) Normalize trailing slash (except for root)
+  if (pathname !== '/' && pathname.endsWith('/')) {
+    const normalized = pathname.slice(0, -1)
+    return NextResponse.redirect(`${origin}${normalized}${request.nextUrl.search}`)
+  }
+
+  // 2) Public paths
+  const isPublicPath =
+    pathname === '/' ||
+    pathname === '/homepage' ||
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/introduction' ||
+    // admin login (both variants)
+    pathname === '/admin/login' ||
+    pathname === '/admin/login/' ||
+    // API auth endpoints
+    pathname.startsWith('/api/auth/') ||
+    pathname === '/api/verify-coupon' ||
+    pathname === '/api/check-final-test-eligibility' ||
+    pathname === '/api/admin/check-admin' ||
+    // static assets
+    pathname.includes('/_next/') ||
+    pathname.includes('/static/') ||
+    pathname.includes('/images/') ||
+    pathname.includes('/favicon.ico')||
+    pathname.startsWith('/public/')||
+    pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|avif|pdf)$/i) !== null
+
   if (isPublicPath) {
     return NextResponse.next()
   }
-  
-  // Check for authentication in multiple places
+
+  // 3) Check auth presence
   const hasAuthCookie = request.cookies.has('firebase-auth-token')
-  
-  // Check for token in authorization header (for API requests)
-  const authHeader = request.headers.get('authorization')
-  const hasAuthHeader = authHeader && authHeader.startsWith('Bearer ')
-  
-  // If no authentication found, redirect to login
-  if (!hasAuthCookie && !hasAuthHeader) {
-    // For API requests, return 401 Unauthorized
-    if (path.startsWith('/api/')) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+  const authHeader = request.headers.get('authorization') || ''
+  const hasAuthHeader = authHeader.startsWith('Bearer ')
+  const hasAuthTokenHeader = !!request.headers.get('x-firebase-auth-token')
+
+  // 4) Check if user is trying to access admin routes
+  if (pathname.startsWith('/admin/') && pathname !== '/admin/login') {
+    // Check if user has admin cookie
+    const isAdmin = request.cookies.has('is-admin') && request.cookies.get('is-admin')?.value === 'true'
     
-    // For page requests, redirect to login
-    return NextResponse.redirect(new URL('/login', request.url))
+    // Also check if user has auth token
+    const hasAuthToken = request.cookies.has('firebase-auth-token')
+    
+    // If not admin or no auth token, redirect to admin login
+    if (!isAdmin || !hasAuthToken) {
+      return NextResponse.redirect(new URL('/admin/login', origin))
+    }
   }
-  
-  // If user is authenticated and trying to access login page, redirect to dashboard
-  if ((path === '/login' || path === '/register') && hasAuthCookie) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+
+  // 5) If authenticated user hits any login page or homepage, send them to dashboard
+  if (
+    hasAuthCookie &&
+    (pathname === '/' ||
+     pathname === '/homepage' ||
+     pathname === '/login' ||
+     pathname === '/register')
+  ) {
+    // For regular login/homepage, redirect to user dashboard
+    return NextResponse.redirect(new URL('/dashboard', origin))
   }
-  
-  // Allow access to all other routes if authenticated
+
+  // 6) If authenticated admin hits admin login, redirect to admin dashboard
+  if (
+    hasAuthCookie && 
+    request.cookies.has('is-admin') && 
+    request.cookies.get('is-admin')?.value === 'true' && 
+    pathname === '/admin/login'
+  ) {
+    return NextResponse.redirect(new URL('/admin', origin))
+  }
+
+  // 7) If no auth, handle API vs pages
+  if (!hasAuthCookie && !hasAuthHeader && !hasAuthTokenHeader) {
+    // a) API routes → 401 (but skip public APIs)
+    if (pathname.startsWith('/api/')) {
+      // already allowed above: /api/auth/*, /api/verify-coupon, etc.
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
+    // b) Admin pages → admin-login
+    if (pathname.startsWith('/admin/')) {
+      return NextResponse.redirect(new URL('/admin/login', origin))
+    }
+
+    // c) All other pages → main login
+    return NextResponse.redirect(new URL('/login', origin))
+  }
+
+  // 8) Authenticated, non-login, non-public → allow!
   return NextResponse.next()
 }
 
-// See "Matching Paths" below to learn more
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Match all request paths except for:
+     * - _next/static
+     * - _next/image
+     * - favicon.ico
      */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],

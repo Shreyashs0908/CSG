@@ -27,9 +27,9 @@ type User = {
 type AuthContextType = {
   user: User | null
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
-  loginWithGoogle: () => Promise<void>
+  login: (email: string, password: string) => Promise<User | void>
+  register: (name: string, email: string, password: string) => Promise<User | void>
+  loginWithGoogle: () => Promise<User | void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   isAuthenticated: boolean
@@ -59,11 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       if (firebaseUser) {
         try {
-          // Get the ID token with force refresh to ensure it's up to date
-          const token = await firebaseUser.getIdToken(true);
-          
-          // Store token in a cookie that persists across sessions
-          setCookie('firebase-auth-token', token, 30); // 30 days
+          let token = null;
+          // Check if getIdToken method exists
+          if (typeof firebaseUser.getIdToken === 'function') {
+            // Get the ID token with force refresh to ensure it's up to date
+            token = await firebaseUser.getIdToken(true);
+            
+            // Store token in a cookie that persists across sessions
+            setCookie('firebase-auth-token', token, 30); // 30 days
+          } else {
+            console.warn('getIdToken method not available on firebaseUser object');
+          }
           
           // Convert Firebase user to our User type
           const userData = {
@@ -80,7 +86,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (typeof window !== 'undefined') {
             localStorage.setItem('user', JSON.stringify(userData));
             // Also store the token in localStorage as a backup
-            localStorage.setItem('firebase-auth-token', token);
+            if (token) {
+              localStorage.setItem('firebase-auth-token', token);
+            }
           }
         } catch (error) {
           console.error('Error processing authentication:', error);
@@ -106,27 +114,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      // Sign in with Firebase
+      // Regular Firebase authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       // Get the user from the credential
       const firebaseUser = userCredential.user;
       
-      // Get the ID token
-      const token = await firebaseUser.getIdToken(true);
-      
-      // Store token in a cookie that persists across sessions
-      setCookie('firebase-auth-token', token, 30); // 30 days
-      
-      // Also store in localStorage as a backup
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('firebase-auth-token', token);
+      let token = null;
+      // Check if getIdToken method exists
+      if (typeof firebaseUser.getIdToken === 'function') {
+        // Get the ID token
+        token = await firebaseUser.getIdToken(true);
+        
+        // Store token in multiple places for redundancy
+        setCookie('firebase-auth-token', token, 30); // 30 days
+        
+        // Also store in localStorage and sessionStorage as a backup
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('firebase-auth-token', token);
+          sessionStorage.setItem('firebase-auth-token', token);
+          
+          // Set a custom attribute on document for debugging
+          try {
+            (document as any).firebaseAuthToken = token.substring(0, 10) + '...';
+          } catch (e) {
+            console.warn('Could not set debug token attribute');
+          }
+        }
+      } else {
+        console.warn('getIdToken method not available on firebaseUser object');
       }
       
       // Convert Firebase user to our User type and store in localStorage
       const userData = {
         id: firebaseUser.uid,
-        name: firebaseUser.displayName || 'User',
+        name: firebaseUser.displayName || email.split('@')[0],
         email: firebaseUser.email || '',
         avatar: firebaseUser.photoURL || undefined,
       };
@@ -162,15 +184,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: name
       });
       
-      // Get the ID token
-      const token = await firebaseUser.getIdToken(true);
-      
-      // Store token in a cookie that persists across sessions
-      setCookie('firebase-auth-token', token, 30); // 30 days
-      
-      // Also store in localStorage as a backup
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('firebase-auth-token', token);
+      let token = null;
+      // Check if getIdToken method exists
+      if (typeof firebaseUser.getIdToken === 'function') {
+        // Get the ID token
+        token = await firebaseUser.getIdToken(true);
+        
+        // Store token in multiple places for redundancy
+        setCookie('firebase-auth-token', token, 30); // 30 days
+        
+        // Also store in localStorage and sessionStorage as a backup
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('firebase-auth-token', token);
+          sessionStorage.setItem('firebase-auth-token', token);
+          
+          // Set a custom attribute on document for debugging
+          try {
+            (document as any).firebaseAuthToken = token.substring(0, 10) + '...';
+          } catch (e) {
+            console.warn('Could not set debug token attribute');
+          }
+        }
+      } else {
+        console.warn('getIdToken method not available on firebaseUser object');
       }
       
       // Convert Firebase user to our User type and store in localStorage
@@ -209,15 +245,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get the user from the credential
       const firebaseUser = result.user;
       
-      // Get the ID token
-      const token = await firebaseUser.getIdToken(true);
-      
-      // Store token in a cookie that persists across sessions
-      setCookie('firebase-auth-token', token, 30); // 30 days
-      
-      // Also store in localStorage as a backup
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('firebase-auth-token', token);
+      let token = null;
+      // Check if getIdToken method exists
+      if (typeof firebaseUser.getIdToken === 'function') {
+        // Get the ID token
+        token = await firebaseUser.getIdToken(true);
+        
+        // Store token in multiple places for redundancy
+        setCookie('firebase-auth-token', token, 30); // 30 days
+        
+        // Also store in localStorage and sessionStorage as a backup
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('firebase-auth-token', token);
+          sessionStorage.setItem('firebase-auth-token', token);
+          
+          // Set a custom attribute on document for debugging
+          try {
+            (document as any).firebaseAuthToken = token.substring(0, 10) + '...';
+          } catch (e) {
+            console.warn('Could not set debug token attribute');
+          }
+        }
+      } else {
+        console.warn('getIdToken method not available on firebaseUser object');
       }
       
       // Convert Firebase user to our User type and store in localStorage
@@ -247,25 +297,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Password reset
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email)
+      await sendPasswordResetEmail(auth, email);
     } catch (error) {
-      console.error("Password reset failed:", error)
-      throw error
+      console.error("Password reset failed:", error);
+      throw error;
     }
   }
 
   // Logout
   const logout = async () => {
     try {
-      // Clear the auth cookie
+      // Clear all auth cookies
       deleteCookie('firebase-auth-token');
-      // Clear localStorage
-      localStorage.removeItem('user');
+      deleteCookie('is-admin'); // Also clear admin cookie if it exists
+      
+      // Clear all storage mechanisms
+      if (typeof window !== 'undefined') {
+        // Clear localStorage
+        localStorage.removeItem('user');
+        localStorage.removeItem('firebase-auth-token');
+        
+        // Clear sessionStorage
+        sessionStorage.removeItem('firebase-auth-token');
+        sessionStorage.removeItem('user');
+        
+        // Clear any custom attributes
+        try {
+          delete (document as any).firebaseAuthToken;
+        } catch (e) {
+          console.warn('Could not delete debug token attribute');
+        }
+        
+        // Force a small delay to ensure all tokens are cleared
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       // Sign out from Firebase
-      await signOut(auth)
+      await signOut(auth);
+      
+      // Update state
+      setUser(null);
+      
+      // Force a page reload to clear any in-memory state
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?logout=true';
+      }
     } catch (error) {
-      console.error("Logout failed:", error)
-      throw error
+      console.error("Logout failed:", error);
+      throw error;
     }
   }
 
