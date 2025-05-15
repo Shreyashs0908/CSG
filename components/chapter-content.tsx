@@ -408,7 +408,34 @@ The scamster may even install a hidden camera near the ATM to capture your card 
                     <CardTitle>{section.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="whitespace-pre-line">{section.content}</div>
+                    {section.title === "Relevant Sections" && typeof section.content === 'string' ? (
+                      <div className="space-y-2">
+                        {section.content.split('\n').map((line, lineIndex) => {
+                          // Check if the line is a category header (ends with a colon)
+                          if (line.trim().endsWith(':')) {
+                            return (
+                              <h3 key={lineIndex} className="font-bold text-lg mt-4 text-blue-600">
+                                {line}
+                              </h3>
+                            );
+                          } 
+                          // Check if it's an empty line
+                          else if (line.trim() === '') {
+                            return <div key={lineIndex} className="h-2"></div>;
+                          }
+                          // Regular content line
+                          else {
+                            return (
+                              <p key={lineIndex} className="ml-4">
+                                {line}
+                              </p>
+                            );
+                          }
+                        })}
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-line">{section.content}</div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
